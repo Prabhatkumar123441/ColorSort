@@ -1,13 +1,10 @@
 import os
 import wx
-import wx.grid as gridlib
-import subprocess
-import threading
 import time
-# import ctypes
-# import ctypes.wintypes
 import wx.adv
-import send2trash  # Required for moving files to trash on macOS and Windows
+import threading
+import subprocess
+import wx.grid as gridlib
 
 
 
@@ -65,18 +62,6 @@ def get_file_paths_with_os_scan(directory, required_file_size_start, required_fi
     return file_paths
 
 
-
-# class SHFILEOPSTRUCT(ctypes.Structure):
-#     _fields_ = [
-#         ("hwnd", ctypes.wintypes.HWND),
-#         ("wFunc", ctypes.c_uint),
-#         ("pFrom", ctypes.wintypes.LPCWSTR),
-#         ("pTo", ctypes.wintypes.LPCWSTR),
-#         ("fFlags", ctypes.c_short),
-#         ("fAnyOperationsAborted", ctypes.wintypes.BOOL),
-#         ("hNameMappings", ctypes.wintypes.LPVOID),
-#         ("lpszProgressTitle", ctypes.wintypes.LPCWSTR)
-#     ]
 
 
 
@@ -153,7 +138,7 @@ class PanelForGrid(wx.Panel):
 
             # Hex color codes 
             hex_colors = [
-                '#ffe119', '#42d4f4', '#f032e6', '#fabed4', 
+                '#ffe119', '#42d4f4', '#fabed4', 
                 '#469990', '#dcbeff', '#fffac8', '#aaffc3', '#a9a9a9'
             ]
 
@@ -319,7 +304,6 @@ class PanelForGrid(wx.Panel):
                 FileSizeSorter.lock.release_lock()
 
             self.batch = 0
-            
             if self.file_info:
                 FileSizeSorter.stop_flag = True
                 start = self.batch*self.initial_batch_size
@@ -356,7 +340,6 @@ class PanelForGrid(wx.Panel):
                                 self.file_grid.SetCellValue(rows_in_file_grid+row, 1, f"{float(float(file_size) / (1024 * 1024))}")
                                 self.file_grid.SetCellValue(rows_in_file_grid+row, 2, "Explore")
                                 self.file_grid.SetCellValue(rows_in_file_grid+row, 3, "Delete")
-
                                 self.Filling_row_with_color(file_size, rows_in_file_grid+row)
                             else:
                                 wx.CallAfter(self.update_gui)
@@ -366,9 +349,9 @@ class PanelForGrid(wx.Panel):
                                 break
                             count += 1
 
-                            if count % batch_size == 0 or count == total_files:
+                            if count % batch_size == 0 or count == total_files or count % 20 == 0:
                                 wx.CallAfter(self.update_gui)
-                                sleep_obj.wait(0.2)  # Sleep for 1 second to throttle updates
+                                sleep_obj.wait(0.001)  # Sleep for 1 second to throttle updates
 
                                 value = int(((rows_in_file_grid + count )/ total_files) * 100)
                                 wx.CallAfter(self.update_progress_bar, value)
@@ -422,10 +405,11 @@ class PanelForGrid(wx.Panel):
             elapsed_time = end_time - start_time
             print(f"Scanned items in {elapsed_time:.4f} seconds")
             self.fully_parsed = None
-            # self.sleep_obj.wait(1)
+            self.sleep_obj.wait(1)
             wx.CallAfter(self.anim_ctrl.Stop)
-            thread = threading.Thread(target=self.process_files)
-            thread.start()
+            # thread = threading.Thread(target=self.process_files)
+            # thread.start()
+            self.process_files()
         except Exception as e:
             print("Error in scan_directory",str(e))
 
@@ -495,9 +479,6 @@ class PanelForGrid(wx.Panel):
                         self.delete_file(file_path)
                     except Exception as e:
                         wx.MessageBox(f"Error deleting file: {e}", "Error", wx.OK | wx.ICON_ERROR)
-            
-
-                
         except Exception as e:
             print("Error in on_grid_cell_click",str(e))
 
@@ -527,23 +508,39 @@ class PanelForGrid(wx.Panel):
     def delete_file(self, file_path):
         try:
             if os.path.isfile(file_path):
-                if "Windows" in self.os_description or "macOS" in self.os_description:
+                if "Windows" in self.os_description:
                     
-                    send2trash.send2trash(file_path)
-                    # import ctypes
-                    # import ctypes.wintypes
-                    # def move_to_trash(file_path):
-                    #     file_op = SHFILEOPSTRUCT()
-                    #     file_op.wFunc = FO_DELETE
-                    #     file_op.pFrom = ctypes.c_wchar_p(file_path + '\0')
-                    #     file_op.pTo = None
-                    #     file_op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION
+                    
+                    import ctypes
+                    import ctypes.wintypes
+                    class SHFILEOPSTRUCT(ctypes.Structure):
+                        _fields_ = [
+                            ("hwnd", ctypes.wintypes.HWND),
+                            ("wFunc", ctypes.c_uint),
+                            ("pFrom", ctypes.wintypes.LPCWSTR),
+                            ("pTo", ctypes.wintypes.LPCWSTR),
+                            ("fFlags", ctypes.c_short),
+                            ("fAnyOperationsAborted", ctypes.wintypes.BOOL),
+                            ("hNameMappings", ctypes.wintypes.LPVOID),
+                            ("lpszProgressTitle", ctypes.wintypes.LPCWSTR)
+                        ]
 
-                    #     result = ctypes.windll.shell32.SHFileOperationW(ctypes.byref(file_op))
-                    #     if result != 0:
-                    #         raise ctypes.WinError(result)
+                    def move_to_trash(file_path):
+                        file_op = SHFILEOPSTRUCT()
+                        file_op.wFunc = FO_DELETE
+                        file_op.pFrom = ctypes.c_wchar_p(file_path + '\0')
+                        file_op.pTo = None
+                        file_op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION
+
+                        result = ctypes.windll.shell32.SHFileOperationW(ctypes.byref(file_op))
+                        if result != 0:
+                            raise ctypes.WinError(result)
                     
-                    # move_to_trash(file_path)
+                    move_to_trash(file_path)
+
+                elif  "macOS" in self.os_description:
+                    import send2trash  # Required for moving files to trash on macOS and Windows
+                    send2trash.send2trash(file_path)
 
                 elif "Linux" in self.os_description:
                     # Move file to trash on Linux (Ubuntu)
@@ -683,6 +680,7 @@ class FileSizeSorter(wx.Frame):
 
                     FileSizeSorter.stop_flag = False
                     with FileSizeSorter.lock:
+                        self.Panel_for_grid.file_grid.Destroy()
                         self.Panel_for_grid.Destroy()
                     self.Panel_for_grid = None
                     FileSizeSorter.stop_flag = True
@@ -717,6 +715,7 @@ class FileSizeSorter(wx.Frame):
 
                         FileSizeSorter.stop_flag = False
                         with FileSizeSorter.lock:
+                            self.Panel_for_grid.file_grid.Destroy()
                             self.Panel_for_grid.Destroy()
                         self.Panel_for_grid = None
                         FileSizeSorter.stop_flag = True
