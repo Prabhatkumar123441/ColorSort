@@ -6,6 +6,12 @@ import threading
 import subprocess
 import wx.grid as gridlib
 
+if "Linux" in wx.GetOsDescription():
+    import ctypes
+    from ctypes.util import find_library
+
+    x11 = ctypes.cdll.LoadLibrary(find_library("X11"))
+    x11.XInitThreads()
 
 
 st = None
@@ -485,22 +491,27 @@ class PanelForGrid(wx.Panel):
     def on_selected_file_dir_browse(self, file_full_path):
         try:
             dirname = os.path.dirname(file_full_path)
-            if os.path.exists(dirname) and os.path.exists(file_full_path):
-                if wx.Platform == '__WXMSW__':
-                    # Code for Windows
-                    subprocess.run(['explorer', '/select,', file_full_path], shell=True)
-                elif wx.Platform == '__WXGTK__':
-                    # Code for Linux
-                    subprocess.run(['nautilus', '--select', file_full_path])
-                elif wx.Platform == '__WXMAC__':
-                    # Code for macOS
-                    subprocess.run(['open', '-R', file_full_path])
+            if os.path.exists(dirname): 
+                if os.path.exists(file_full_path):
+                    if wx.Platform == '__WXMSW__':
+                        # Code for Windows
+                        subprocess.run(['explorer', '/select,', file_full_path], shell=True)
+                    elif wx.Platform == '__WXGTK__':
+                        # Code for Linux
+                        subprocess.run(['nautilus', '--select', file_full_path])
+                    elif wx.Platform == '__WXMAC__':
+                        # Code for macOS
+                        subprocess.run(['open', '-R', file_full_path])
+                    else:
+                        # Unsupported platform
+                        print("Unsupported operating system.")
+                    self.delete_row_from_filegrid(file_full_path)
                 else:
-                    # Unsupported platform
-                    print("Unsupported operating system.")
+                    wx.MessageBox("This path is not valid for browse.", "Warning",
+                                        wx.OK | wx.ICON_ERROR)
             else:
-                wx.MessageBox("This path is not valid for browse.", "Warning",
-                                    wx.OK | wx.ICON_ERROR)
+                wx.MessageBox("Directory of this path is not exist.", "Warning",
+                                    wx.OK | wx.ICON_ERROR)   
                 self.delete_row_from_filegrid(file_full_path)
         except Exception as e:
             print("Error in on_selected_file_dir_browse",str(e))
@@ -509,8 +520,6 @@ class PanelForGrid(wx.Panel):
         try:
             if os.path.isfile(file_path):
                 if "Windows" in self.os_description:
-                    
-                    
                     import ctypes
                     import ctypes.wintypes
                     class SHFILEOPSTRUCT(ctypes.Structure):
@@ -539,8 +548,10 @@ class PanelForGrid(wx.Panel):
                     move_to_trash(file_path)
 
                 elif  "macOS" in self.os_description:
-                    import send2trash  # Required for moving files to trash on macOS and Windows
-                    send2trash.send2trash(file_path)
+                    # import send2trash  # Required for moving files to trash on macOS and Windows
+                    # send2trash.send2trash(file_path)
+                    command = f"osascript -e 'tell application \"Finder\" to delete POSIX file \"{file_path}\"'"
+                    os.system(command)
 
                 elif "Linux" in self.os_description:
                     # Move file to trash on Linux (Ubuntu)
@@ -555,9 +566,10 @@ class PanelForGrid(wx.Panel):
 
     def delete_row_from_filegrid(self, file_path):
         try:
-            row = self.find_row_by_file_path(file_path)
-            if row >= 0:
-                self.file_grid.DeleteRows(row)
+            if not os.path.exists(file_path):
+                row = self.find_row_by_file_path(file_path)
+                if row >= 0:
+                    self.file_grid.DeleteRows(row)
         except Exception as e:
             print("Error in delete_row_from_filegrid",str(e))
 
@@ -576,90 +588,96 @@ class FileSizeSorter(wx.Frame):
     stop_flag = True
     lock = threading.Lock()
     def __init__(self, parent, title):
-        super(FileSizeSorter, self).__init__(parent, title=title, size=(700, 500))
-        # self.SetBackgroundColour('#252525')
-        # self.SetBackgroundColour("#b2babb") 
-        self.SetBackgroundColour('#2c001e') 
-        self.os_description = wx.GetOsDescription()
-        panel = wx.Panel(self)
-        self.panel = panel
+        try:
+            super(FileSizeSorter, self).__init__(parent, title=title, size=(700, 500))
+            # self.SetBackgroundColour('#252525')
+            # self.SetBackgroundColour("#b2babb") 
+            self.SetBackgroundColour('#2c001e') 
+            self.os_description = wx.GetOsDescription()
+            panel = wx.Panel(self)
+            self.panel = panel
 
 
 
-        self.thread_m = None
+            self.thread_m = None
 
-        self.checkbox_flag = False
-        self.checkbox = wx.CheckBox(panel, label="")        
-        self.checkbox.Bind(wx.EVT_CHECKBOX, self.OnCheckBox)
-        self.checkbox.SetToolTip("If you want to include files less 500kb size, then check")
+            self.checkbox_flag = False
+            self.checkbox = wx.CheckBox(panel, label="")        
+            self.checkbox.Bind(wx.EVT_CHECKBOX, self.OnCheckBox)
+            self.checkbox.SetToolTip("If you want to include files less 500kb size, then check")
 
-        self.required_file_size_start = wx.TextCtrl(panel, size=((50, 25)))
-        self.required_file_size_start.SetToolTip("Set the MB more then want to get files with in starting size")
-        
-        self.required_file_size_end = wx.TextCtrl(panel, size=((50, 25)))
-        self.required_file_size_end.SetToolTip("Set the MB less then want to get files with in ending size")
-        
-        self.directory_path = wx.TextCtrl(panel, size=((250, 25)))
-        self.directory_path.SetToolTip("Directory path which want to scan")
+            self.required_file_size_start = wx.TextCtrl(panel, size=((50, 25)))
+            self.required_file_size_start.SetToolTip("Set the MB more then want to get files with in starting size")
+            
+            self.required_file_size_end = wx.TextCtrl(panel, size=((50, 25)))
+            self.required_file_size_end.SetToolTip("Set the MB less then want to get files with in ending size")
+            
+            self.directory_path = wx.TextCtrl(panel, size=((250, 25)))
+            self.directory_path.SetToolTip("Directory path which want to scan")
 
-        self.scan_button = wx.Button(panel, label="Scan Directory")
-        self.scan_button.Bind(wx.EVT_BUTTON, self.on_scan)
+            self.scan_button = wx.Button(panel, label="Scan Directory")
+            self.scan_button.Bind(wx.EVT_BUTTON, self.on_scan)
 
-        self.refresh_button = wx.Button(panel, label="Refresh")
-        self.refresh_button.Bind(wx.EVT_BUTTON, self.on_refresh)
+            self.refresh_button = wx.Button(panel, label="Refresh")
+            self.refresh_button.Bind(wx.EVT_BUTTON, self.on_refresh)
 
-        self.stop_button = wx.Button(panel, label="Stop")
-        self.stop_button.Bind(wx.EVT_BUTTON, self.on_stop)
+            self.stop_button = wx.Button(panel, label="Stop")
+            self.stop_button.Bind(wx.EVT_BUTTON, self.on_stop)
 
-        self.exit_button = wx.Button(panel, label="Exit")
-        self.exit_button.Bind(wx.EVT_BUTTON, self.on_exit)
-
-
-        self.progress_gauge = SophisticatedProgressBar(panel, range=100, size=(650, 20), color=wx.Colour(34, 139, 34))
-        
-        self.progress_gauge.SetToolTip(f"Progress : {0}%")
+            self.exit_button = wx.Button(panel, label="Exit")
+            self.exit_button.Bind(wx.EVT_BUTTON, self.on_exit)
 
 
-        script_path = os.path.abspath(__file__)
+            self.progress_gauge = SophisticatedProgressBar(panel, range=100, size=(650, 20), color=wx.Colour(34, 139, 34))
+            
+            self.progress_gauge.SetToolTip(f"Progress : {0}%")
 
-        script_directory = os.path.dirname(script_path)
-        loader_path = os.path.join(script_directory, "loader.gif")
-        
-        gif = wx.adv.Animation(loader_path)
-        self.anim_ctrl = wx.adv.AnimationCtrl(panel, -1, gif)
 
-        self.Panel_for_grid = None
+            script_path = os.path.abspath(__file__)
 
-        sizer = wx.BoxSizer(wx.VERTICAL)
+            script_directory = os.path.dirname(script_path)
+            loader_path = os.path.join(script_directory, "loader.gif")
+            
+            gif = wx.adv.Animation(loader_path)
+            self.anim_ctrl = wx.adv.AnimationCtrl(panel, -1, gif)
 
-        self.sizer = sizer
+            self.Panel_for_grid = None
 
-        self.hori_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            sizer = wx.BoxSizer(wx.VERTICAL)
 
-        self.hori_sizer.Add(self.anim_ctrl, 0, wx.ALIGN_CENTER | wx.ALL, 5)
-        self.hori_sizer.Add(self.checkbox, 0, wx.ALIGN_CENTER | wx.ALL, 5)
-        self.hori_sizer.Add(self.required_file_size_start, 0, wx.ALIGN_CENTER | wx.ALL, 5)
-        self.hori_sizer.Add(self.required_file_size_end, 0, wx.ALIGN_CENTER | wx.ALL, 5)
-        self.hori_sizer.Add(self.scan_button, 0, wx.ALIGN_CENTER | wx.ALL, 5)
-        self.hori_sizer.Add(self.stop_button, 0, wx.ALIGN_CENTER | wx.ALL, 5)
-        self.hori_sizer.Add(self.refresh_button, 0, wx.ALIGN_CENTER | wx.ALL, 5)
-        self.hori_sizer.Add(self.directory_path, 0, wx.ALIGN_CENTER | wx.ALL, 5)
-        self.hori_sizer.Add(self.exit_button, 0, wx.ALIGN_CENTER | wx.ALL, 5)
-        
+            self.sizer = sizer
 
-        sizer.Add(self.hori_sizer, 0, wx.EXPAND | wx.ALL, 5)
-        sizer.Add(self.progress_gauge, 0, wx.EXPAND | wx.ALL, 5)
-        # sizer.Add(self.anim_ctrl, 0, wx.EXPAND | wx.ALL, 5)
+            self.hori_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        panel.SetSizer(sizer)
-        self.directory = None
+            self.hori_sizer.Add(self.anim_ctrl, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+            self.hori_sizer.Add(self.checkbox, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+            self.hori_sizer.Add(self.required_file_size_start, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+            self.hori_sizer.Add(self.required_file_size_end, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+            self.hori_sizer.Add(self.scan_button, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+            self.hori_sizer.Add(self.stop_button, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+            self.hori_sizer.Add(self.refresh_button, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+            self.hori_sizer.Add(self.directory_path, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+            self.hori_sizer.Add(self.exit_button, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+            
+
+            sizer.Add(self.hori_sizer, 0, wx.EXPAND | wx.ALL, 5)
+            sizer.Add(self.progress_gauge, 0, wx.EXPAND | wx.ALL, 5)
+            # sizer.Add(self.anim_ctrl, 0, wx.EXPAND | wx.ALL, 5)
+
+            panel.SetSizer(sizer)
+            self.directory = None
+        except Exception as e:
+            print("Error in __init__ FileSizeSorter",str(e))
     
     def OnCheckBox(self, event):
         # Check the state of the checkbox
-        if self.checkbox.IsChecked():
-            self.checkbox_flag = True
-        else:
-            self.checkbox_flag = False
+        try:
+            if self.checkbox.IsChecked():
+                self.checkbox_flag = True
+            else:
+                self.checkbox_flag = False
+        except Exception as e:
+            print("Error in OnCheckBox",str(e))
 
 
     def on_scan(self, event):
@@ -704,7 +722,10 @@ class FileSizeSorter(wx.Frame):
     
     def on_exit(self, event):
         # wx.Exit()
-        self.Destroy()
+        try:
+            self.Destroy()
+        except Exception as e:
+            print("Error in on_exit",str(e))
 
         
     def on_refresh(self, event):
@@ -732,8 +753,6 @@ class FileSizeSorter(wx.Frame):
                     self.thread_m = threading.Thread(target=self.Panel_for_grid.scan_directory,args=(self.directory,self.checkbox_flag))
                     self.thread_m.daemon = True
                     self.thread_m.start()
-
-
         except Exception as e:
             print("Error in on_refresh",str(e))
 
