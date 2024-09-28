@@ -6,6 +6,10 @@ import threading
 import subprocess
 import wx.grid as gridlib
 
+
+
+
+
 if "Linux" in wx.GetOsDescription():
     import ctypes
     from ctypes.util import find_library
@@ -14,11 +18,16 @@ if "Linux" in wx.GetOsDescription():
     x11.XInitThreads()
 
 
+
+
+
 st = None
 et = None
 FO_DELETE = 3
 FOF_ALLOWUNDO = 0x00000040
 FOF_NOCONFIRMATION = 0x00000010
+
+
 
 
 
@@ -49,23 +58,30 @@ def get_file_paths_with_os_scan(directory, required_file_size_start, required_fi
                 elif entry.is_dir():
                     file_paths.extend(get_file_paths_with_os_scan(entry.path, required_file_size_start, required_file_size_end))
             except PermissionError as e:
-                print(f"Permission denied: {entry.path}")
-                print(f"Permission denied: {str(e)}")
+                # print(f"Permission denied: {entry.path}")
+                # print(f"Permission denied: {str(e)}")
+                pass
             except FileNotFoundError as e:
-                print(f"File not found: {entry.path}")
-                print(f"File not found: {str(e)}")
+                # print(f"File not found: {entry.path}")
+                # print(f"File not found: {str(e)}")
+                pass
             except OSError as e:
-                print(f"OS error: {entry.path}")
-                print(f"OS error: {str(e)}")
+                # print(f"OS error: {entry.path}")
+                # print(f"OS error: {str(e)}")
+                pass
     except PermissionError as e:
-        print(f"Permission denied: {str(e)}")
+        # print(f"Permission denied: {str(e)}")
+        pass
     except FileNotFoundError as e:
-        print(f"File not found: {directory}")
-        print(f"File not found: {str(e)}")
+        # print(f"File not found: {directory}")
+        # print(f"File not found: {str(e)}")
+        pass
     except OSError as e:
-        print(f"OS error: {directory}")
-        print(f"OS error: {str(e)}")
+        # print(f"OS error: {directory}")
+        # print(f"OS error: {str(e)}")
+        pass
     return file_paths
+
 
 
 
@@ -80,29 +96,39 @@ class SophisticatedProgressBar(wx.Panel):
         self.Bind(wx.EVT_PAINT, self.on_paint)
 
     def on_paint(self, event):
-        dc = wx.BufferedPaintDC(self)
-        rect = self.GetClientRect()
-        dc.SetBackground(wx.Brush(self.GetBackgroundColour()))
-        dc.Clear()
+        try:
+            dc = wx.BufferedPaintDC(self)
+            rect = self.GetClientRect()
+            dc.SetBackground(wx.Brush(self.GetBackgroundColour()))
+            dc.Clear()
 
-        width = rect.width * self.value // self.range
-        gauge_rect = wx.Rect(0, 0, width, rect.height)
+            width = rect.width * self.value // self.range
+            gauge_rect = wx.Rect(0, 0, width, rect.height)
 
-        dc.SetBrush(wx.Brush(self.color))
-        dc.SetPen(wx.Pen(self.color))
-        dc.DrawRectangle(gauge_rect)
+            dc.SetBrush(wx.Brush(self.color))
+            dc.SetPen(wx.Pen(self.color))
+            dc.DrawRectangle(gauge_rect)
 
-        percentage = f"{(self.value / self.range) * 100:.2f}%"
-        dc.SetTextForeground(wx.BLACK)
-        dc.DrawText(percentage, rect.width // 2 - dc.GetTextExtent(percentage)[0] // 2, rect.height // 2 - dc.GetTextExtent(percentage)[1] // 2)
+            percentage = f"{(self.value / self.range) * 100:.2f}%"
+            dc.SetTextForeground(wx.BLACK)
+            dc.DrawText(percentage, rect.width // 2 - dc.GetTextExtent(percentage)[0] // 2, rect.height // 2 - dc.GetTextExtent(percentage)[1] // 2)
+        except Exception as e:
+            pass
+    
 
     def SetValue(self, value):
-        if 0 <= value <= self.range:
-            self.value = value
-            self.Refresh()
+        try:
+            if 0 <= value <= self.range:
+                self.value = value
+                self.Refresh()
+        except Exception as e:
+            pass
 
     def getvalue(self):
-        return self.value
+        try:
+            return self.value
+        except Exception as e:
+            pass
 
 
 
@@ -128,6 +154,7 @@ class PanelForGrid(wx.Panel):
 
             self.sleep_obj = threading.Event()
 
+            # # ------------------------------------------------------------------
             # self.colors = [
             #     wx.Colour(*wx.ColourDatabase().Find('LIGHT BLUE')),
             #     wx.Colour(*wx.ColourDatabase().Find('GREEN')),
@@ -137,12 +164,18 @@ class PanelForGrid(wx.Panel):
             #     wx.Colour(*wx.ColourDatabase().Find('ORANGE')),
             #     wx.Colour(*wx.ColourDatabase().Find('GREY'))
             # ]
+            # # ------------------------------------------------------------------
 
+
+
+
+
+            ## ------------------------------------------------------------------
             def hex_to_wx_colour(hex_color):
                 """Convert hex color to wx.Colour."""
                 return wx.Colour(int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16))
 
-            # Hex color codes 
+            # # Hex color codes 
             hex_colors = [
                 '#ffe119', '#42d4f4', '#fabed4', 
                 '#469990', '#dcbeff', '#fffac8', '#aaffc3', '#a9a9a9'
@@ -150,6 +183,11 @@ class PanelForGrid(wx.Panel):
 
             # Convert hex colors to wx.Colour
             self.colors = [hex_to_wx_colour(color) for color in hex_colors]
+            ## ------------------------------------------------------------------
+
+
+
+
 
             self.current_color_index = 0
             self.file_grid = gridlib.Grid(self)
@@ -161,9 +199,11 @@ class PanelForGrid(wx.Panel):
             # self.file_grid.AutoSizeColumns()
             # self.file_grid.EnableEditing(False)
             self.file_grid.Bind(gridlib.EVT_GRID_CELL_LEFT_CLICK, self.on_grid_cell_click)
+            self.file_grid.Bind(gridlib.EVT_GRID_CELL_RIGHT_CLICK, self.on_grid_cell_click)
+            self.file_grid.Bind(gridlib.EVT_GRID_CELL_LEFT_DCLICK, self.double_click_on_row)
             self.file_grid.Bind(wx.EVT_MOUSEWHEEL, self.on_scroll)
             self.file_grid.Bind(wx.EVT_SCROLLWIN, self.on_scroll)
-            # self.file_grid.Bind(wx.EVT_SCROLLWIN, self.on_scroll)
+            # self.file_grid.Bind(wx.EVT_SCROLLWIN, self.on_scroll)  double_click_on_row
             
             self.scroll_timeout = None
 
@@ -186,12 +226,12 @@ class PanelForGrid(wx.Panel):
         try:
             # total_width = self.file_grid.GetSize().GetWidth()
             parent_size = self.GetParent().GetSize()
-            total_width = (parent_size.GetWidth()*8.5)//10
+            total_width = (parent_size.GetWidth()*9.5)//10
             
             col0_width = int(total_width * 0.7)
-            col1_width = int(total_width * 0.1)
-            col2_width = int(total_width * 0.1)
-            col3_width = int(total_width * 0.1)
+            col1_width = int(total_width * 0.16)
+            col2_width = int(total_width * 0.07)
+            col3_width = int(total_width * 0.07)
 
             self.file_grid.SetColSize(0, col0_width)
             self.file_grid.SetColSize(1, col1_width)
@@ -216,7 +256,6 @@ class PanelForGrid(wx.Panel):
                 if self.file_info and self.initial_batch_loaded:
                     if scroll_position + scrollbar >= scroll_range and not self.fully_parsed:
                         self.OnScrollDebounced(event)
-                        print("on_scroll ------")
                 
             event.Skip()
         except Exception as e:
@@ -415,7 +454,8 @@ class PanelForGrid(wx.Panel):
             wx.CallAfter(self.anim_ctrl.Stop)
             # thread = threading.Thread(target=self.process_files)
             # thread.start()
-            self.process_files()
+            # self.process_files()
+            wx.CallAfter(self.process_files)
         except Exception as e:
             print("Error in scan_directory",str(e))
 
@@ -488,6 +528,15 @@ class PanelForGrid(wx.Panel):
         except Exception as e:
             print("Error in on_grid_cell_click",str(e))
 
+    def double_click_on_row(self,event):
+        try:
+            row = event.GetRow()
+            col = event.GetCol()
+            file_full_path = self.file_grid.GetCellValue(row, 0)
+            self.on_selected_file_dir_browse(file_full_path)
+        except Exception as e:
+            print("Error in double_click_on_row",str(e))
+    
     def on_selected_file_dir_browse(self, file_full_path):
         try:
             dirname = os.path.dirname(file_full_path)
@@ -505,17 +554,16 @@ class PanelForGrid(wx.Panel):
                     else:
                         # Unsupported platform
                         print("Unsupported operating system.")
-                    self.delete_row_from_filegrid(file_full_path)
                 else:
                     wx.MessageBox("This path is not valid for browse.", "Warning",
                                         wx.OK | wx.ICON_ERROR)
             else:
                 wx.MessageBox("Directory of this path is not exist.", "Warning",
                                     wx.OK | wx.ICON_ERROR)   
-                self.delete_row_from_filegrid(file_full_path)
+            self.delete_row_from_filegrid(file_full_path)
         except Exception as e:
             print("Error in on_selected_file_dir_browse",str(e))
-
+    
     def delete_file(self, file_path):
         try:
             if os.path.isfile(file_path):
@@ -589,7 +637,7 @@ class FileSizeSorter(wx.Frame):
     lock = threading.Lock()
     def __init__(self, parent, title):
         try:
-            super(FileSizeSorter, self).__init__(parent, title=title, size=(700, 500))
+            super(FileSizeSorter, self).__init__(parent, title=title, size=(1000, 500))
             # self.SetBackgroundColour('#252525')
             # self.SetBackgroundColour("#b2babb") 
             self.SetBackgroundColour('#2c001e') 
