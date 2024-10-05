@@ -496,6 +496,9 @@ class PanelForGrid(wx.Panel):
                 required_file_size_start = float_number * 1024 * 1024
 
             # file_paths = glob.glob(os.path.join(directory, "**"), recursive=True)
+            if required_file_size_end:
+                if required_file_size_end <= required_file_size_start:
+                    required_file_size_end = None
             file_paths = get_file_paths_with_os_scan(directory, required_file_size_start, required_file_size_end)
             file_paths.sort(key=lambda x: x[1], reverse=True)
 
